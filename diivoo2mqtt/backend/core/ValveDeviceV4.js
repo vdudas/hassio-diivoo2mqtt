@@ -1175,7 +1175,18 @@ class ValveDevice extends EventEmitter {
                 source: ch.sourceText,
                 lastSync: ch.lastSyncTime ? new Date(ch.lastSyncTime).toISOString() : null,
                 rainDelayHours,
-                rainDelayUntil
+                rainDelayUntil,
+
+                // Channel config fields
+                defaultOpenSeconds: ch.settings?.durationSeconds || 600,
+                intervalOnSeconds: ch.settings?.intervalOnSeconds || 10,
+                intervalOffSeconds: ch.settings?.intervalOffSeconds || 30,
+                scheduleCount: Array.isArray(ch.schedules) ? ch.schedules.length : 0,
+
+                // Last event data
+                lastWaterConsumption: ch.lastWaterConsumption || 0,
+                lastElapsedSeconds: ch.lastElapsedSeconds || 0,
+                lastEventDate: ch.lastEventDate || null,
             };
         }
 
@@ -1200,9 +1211,21 @@ class ValveDevice extends EventEmitter {
             battery: this.lastBatteryText,
             batteryPercent,
             isOnline: this.isOnline,
+            firmwareVersion: this.firmwareVersion != null ? `v${this.firmwareVersion}` : 'unknown',
+            hardwareRevision: this.hardwareRevision != null ? String(this.hardwareRevision) : 'unknown',
+            bestRssi: this._computeBestRssi(),
             gateways: gatewaysInfo,
             channels: liveChannels
         };
+    }
+
+    _computeBestRssi() {
+        if (this.gatewayStats.size === 0) return -100;
+        let best = -Infinity;
+        for (const stats of this.gatewayStats.values()) {
+            if (stats.rssi > best) best = stats.rssi;
+        }
+        return best;
     }
 
     _notifyStateChange(triggerReason) {

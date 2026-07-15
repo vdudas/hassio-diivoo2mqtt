@@ -1,8 +1,30 @@
+// ###############################################################
+// #                                                             #
+// #                           NOTICE                            #
+// #                                                             #
+// #   THIS SOFTWARE IS THE PROPERTY OF AND CONTAINS             #
+// #   CONFIDENTIAL INFORMATION OF INFOR AND/OR ITS AFFILIATES   #
+// #   OR SUBSIDIARIES AND SHALL NOT BE DISCLOSED WITHOUT PRIOR  #
+// #   WRITTEN PERMISSION. LICENSED CUSTOMERS MAY COPY AND       #
+// #   ADAPT THIS SOFTWARE FOR THEIR OWN USE IN ACCORDANCE WITH  #
+// #   THE TERMS OF THEIR SOFTWARE LICENSE AGREEMENT.            #
+// #   ALL OTHER RIGHTS RESERVED.                                #
+// #                                                             #
+// #   (c) COPYRIGHT 2025 INFOR.  ALL RIGHTS RESERVED.           #
+// #   THE WORD AND DESIGN MARKS SET FORTH HEREIN ARE            #
+// #   TRADEMARKS AND/OR REGISTERED TRADEMARKS OF INFOR          #
+// #   AND/OR ITS AFFILIATES AND SUBSIDIARIES. ALL RIGHTS        #
+// #   RESERVED.  ALL OTHER TRADEMARKS LISTED HEREIN ARE         #
+// #   THE PROPERTY OF THEIR RESPECTIVE OWNERS.                  #
+// #                                                             #
+// ###############################################################
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
+const { normalizeSchedule } = require('../core/channelConfig');
 
 class WebServer {
     constructor(hub, config) {
@@ -365,7 +387,7 @@ class WebServer {
                     const channel = this._getChannelOrThrow(device, Number(channelId));
 
                     const normalizedSchedules = Array.isArray(schedules)
-                        ? schedules.map((item) => this._normalizeSchedule(item || {}))
+                        ? schedules.map((item) => normalizeSchedule(item || {}))
                         : [];
 
                     channel.schedules = normalizedSchedules;
@@ -408,7 +430,7 @@ class WebServer {
                 }
 
                 try {
-                    const normalizedSchedule = this._normalizeSchedule(schedule || {});
+                    const normalizedSchedule = normalizeSchedule(schedule || {});
                     const channel = this._getChannelOrThrow(device, Number(channelId));
 
                     if (!Array.isArray(channel.schedules)) {
@@ -679,47 +701,6 @@ class WebServer {
         } else {
             console.warn(`[Web] No response to config-refresh ping from valve ${device.valveId}.`);
         }
-    }
-
-    _normalizeSchedule(schedule) {
-        const mode = schedule.mode === 'mist' ? 'mist' : 'normal';
-        const startTime = typeof schedule.startTime === 'string' && /^\d{2}:\d{2}$/.test(schedule.startTime)
-            ? schedule.startTime
-            : '06:00';
-
-        const durationMinutes = Math.max(1, Math.min(1440, Number(schedule.durationMinutes) || 10));
-        const repeat = ['daily', 'odd', 'even', 'custom'].includes(schedule.repeat)
-            ? schedule.repeat
-            : 'daily';
-
-        let weekdays = [];
-        if (repeat === 'custom') {
-            weekdays = Array.isArray(schedule.weekdays)
-                ? Array.from(new Set(schedule.weekdays.map(Number).filter((day) => day >= 1 && day <= 7))).sort((a, b) => a - b)
-                : [];
-
-            if (weekdays.length === 0) {
-                throw new Error('At least one weekday must be selected for a custom repeat schedule.');
-            }
-        }
-
-        const normalized = {
-            id: schedule.id || `plan-${Date.now()}`,
-            mode,
-            startTime,
-            durationMinutes,
-            repeat,
-            weekdays,
-        };
-
-        if (mode === 'mist') {
-            const mistOnSeconds = Math.max(1, Math.min(3600, Number(schedule.mistOnSeconds) || 10));
-            const mistOffSeconds = Math.max(1, Math.min(3600, Number(schedule.mistOffSeconds) || 30));
-            normalized.mistOnSeconds = mistOnSeconds;
-            normalized.mistOffSeconds = mistOffSeconds;
-        }
-
-        return normalized;
     }
 
     _inferBaseUrl(socket) {

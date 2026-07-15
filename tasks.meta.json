@@ -1,0 +1,484 @@
+{
+  "pbtResults": {
+    "2.2 Write property tests for `_computeBestRssi()` and `getLiveState()` extensions": {
+      "status": "passed",
+      "lastRunTimestamp": 1784152715859
+    },
+    "8.3 Write property test for schedule normalization consistency": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153280995
+    },
+    "8.4 Write property test for global schedule limit enforcement": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153281764
+    },
+    "8.5 Write property test for invalid schedule payloads": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153282526
+    },
+    "8.6 Write property test for schedule duration clamping": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153283390
+    },
+    "8.1 Write property test for valid command updates": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153409575
+    },
+    "8.2 Write property test for invalid payload rejection": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153413109
+    },
+    "8.7 Write property test for valve entity defaultOpenSeconds usage": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153416907
+    },
+    "8.8 Write property test for invalid commands triggering state re-publish": {
+      "status": "passed",
+      "lastRunTimestamp": 1784153421281
+    }
+  },
+  "executionHistory": {
+    "1.1 Create `core/channelConfig.js` shared utility module": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148946319
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148960116
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149297109
+      }
+    ],
+    "1.2 Refactor `webServer.js` to use shared `channelConfig.js`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148950893
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149301391
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149444299
+      }
+    ],
+    "2.1 Add `_computeBestRssi()` method and extend `getLiveState()` in `ValveDeviceV4.js`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951136
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149302365
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149445347
+      }
+    ],
+    "2.2 Write property tests for `_computeBestRssi()` and `getLiveState()` extensions": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951218
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149450686
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152730200
+      }
+    ],
+    "3. Checkpoint - Ensure shared utility and state extensions work": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951281
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152739829
+      }
+    ],
+    "4.1 Add new MQTT topic subscriptions in `mqttBridge.js`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951332
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149451528
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152649222
+      }
+    ],
+    "4.2 Add discovery messages for number entities (default_duration, mist_on, mist_off) in `publishAutoDiscovery()`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951380
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152740751
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152874412
+      }
+    ],
+    "4.3 Add discovery messages for diagnostic sensors (water_consumption, last_duration, last_event, firmware, hw_revision, rssi, target_runtime)": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951426
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152741698
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152875378
+      }
+    ],
+    "4.4 Add discovery for schedules JSON sensor": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951486
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152742587
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152876383
+      }
+    ],
+    "4.5 Add discovery for valve entity (water)": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951535
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152744566
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152877153
+      }
+    ],
+    "5.1 Implement command handlers for number entities (default_duration, mist_on, mist_off) in `handleIncomingMessage()`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951598
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152882868
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153036098
+      }
+    ],
+    "5.2 Implement schedules command handler in `handleIncomingMessage()`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951663
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152883685
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153036879
+      }
+    ],
+    "5.3 Implement valve command handler in `handleIncomingMessage()`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951743
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152884482
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153037697
+      }
+    ],
+    "5.4 Implement `publishScheduleAttributes()` method and integrate into `publishDeviceState()`": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951800
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152885420
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153038590
+      }
+    ],
+    "6. Checkpoint - Verify command handlers and discovery": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951865
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153043945
+      }
+    ],
+    "7.1 Add locale strings for all new entity names to `en.json` and other locale files": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951928
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153044817
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153177167
+      }
+    ],
+    "8.1 Write property test for valid command updates": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148951975
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153187920
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153440391
+      }
+    ],
+    "8.2 Write property test for invalid payload rejection": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952017
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153441275
+      }
+    ],
+    "8.3 Write property test for schedule normalization consistency": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952066
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153184728
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153437215
+      }
+    ],
+    "8.4 Write property test for global schedule limit enforcement": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952119
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153185503
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153437911
+      }
+    ],
+    "8.5 Write property test for invalid schedule payloads": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952197
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153186285
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153438762
+      }
+    ],
+    "8.6 Write property test for schedule duration clamping": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952267
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153187127
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153439615
+      }
+    ],
+    "8.7 Write property test for valve entity defaultOpenSeconds usage": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952327
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153442066
+      }
+    ],
+    "8.8 Write property test for invalid commands triggering state re-publish": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952382
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153443020
+      }
+    ],
+    "9. Final checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784148952432
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153448582
+      },
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153480162
+      }
+    ],
+    "1. Create shared utility module and refactor webServer": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784149444387
+      }
+    ],
+    "2. Extend ValveDeviceV4 getLiveState": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152730260
+      }
+    ],
+    "4. Add MQTT subscriptions and discovery messages": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784152877216
+      }
+    ],
+    "5. Implement command handlers and state publishing": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153038687
+      }
+    ],
+    "7. Add locale strings": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153177264
+      }
+    ],
+    "8. Write property-based tests": [
+      {
+        "executionId": "2744095f-d0fb-4f46-8ac0-67a4b3a5dd4e",
+        "chatSessionId": "sess_efe6e65b-1417-4652-b778-978b0fd9e054",
+        "timestamp": 1784153443078
+      }
+    ]
+  }
+}

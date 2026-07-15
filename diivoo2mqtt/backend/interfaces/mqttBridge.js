@@ -1,7 +1,29 @@
+// ###############################################################
+// #                                                             #
+// #                           NOTICE                            #
+// #                                                             #
+// #   THIS SOFTWARE IS THE PROPERTY OF AND CONTAINS             #
+// #   CONFIDENTIAL INFORMATION OF INFOR AND/OR ITS AFFILIATES   #
+// #   OR SUBSIDIARIES AND SHALL NOT BE DISCLOSED WITHOUT PRIOR  #
+// #   WRITTEN PERMISSION. LICENSED CUSTOMERS MAY COPY AND       #
+// #   ADAPT THIS SOFTWARE FOR THEIR OWN USE IN ACCORDANCE WITH  #
+// #   THE TERMS OF THEIR SOFTWARE LICENSE AGREEMENT.            #
+// #   ALL OTHER RIGHTS RESERVED.                                #
+// #                                                             #
+// #   (c) COPYRIGHT 2025 INFOR.  ALL RIGHTS RESERVED.           #
+// #   THE WORD AND DESIGN MARKS SET FORTH HEREIN ARE            #
+// #   TRADEMARKS AND/OR REGISTERED TRADEMARKS OF INFOR          #
+// #   AND/OR ITS AFFILIATES AND SUBSIDIARIES. ALL RIGHTS        #
+// #   RESERVED.  ALL OTHER TRADEMARKS LISTED HEREIN ARE         #
+// #   THE PROPERTY OF THEIR RESPECTIVE OWNERS.                  #
+// #                                                             #
+// ###############################################################
+
 // interfaces/mqttBridge.js
 const mqtt = require('mqtt');
 const path = require('path');
 const fs = require('fs');
+const { normalizeSchedule, countTotalSchedules } = require('../core/channelConfig');
 
 function loadLocale(lang) {
     const localesDir = path.join(__dirname, '..', 'locales');
@@ -60,6 +82,11 @@ class MqttBridge {
                 'diivoo/gateway/+/clearwifi/press',
                 'diivoo/gateway/+/version/get',
                 'diivoo/gateway/+/update/set',
+                'diivoo/+/ch/+/default_duration/set',
+                'diivoo/+/ch/+/mist_on/set',
+                'diivoo/+/ch/+/mist_off/set',
+                'diivoo/+/ch/+/schedules/set',
+                'diivoo/+/valve/+/cmd',
             ]);
 
             // Discovery für bekannte Geräte/Gateways rausschieben
@@ -301,17 +328,238 @@ class MqttBridge {
                     device: deviceBase
                 })
             );
+
+            // Default Duration (Number Entity)
+            this._publish(
+                `${discoveryPrefix}/number/${valveId}_ch${ch}_default_duration/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_default_duration', { ch }),
+                    unique_id: `diivoo_${valveId}_default_duration_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].defaultOpenSeconds }}`,
+                    command_topic: `diivoo/${valveId}/ch/${ch}/default_duration/set`,
+                    min: 1,
+                    max: 65535,
+                    step: 1,
+                    unit_of_measurement: 's',
+                    icon: 'mdi:timer-outline',
+                    entity_category: 'config',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Misting On-Time (Number Entity)
+            this._publish(
+                `${discoveryPrefix}/number/${valveId}_ch${ch}_mist_on/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_mist_on', { ch }),
+                    unique_id: `diivoo_${valveId}_mist_on_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].intervalOnSeconds }}`,
+                    command_topic: `diivoo/${valveId}/ch/${ch}/mist_on/set`,
+                    min: 1,
+                    max: 3600,
+                    step: 1,
+                    unit_of_measurement: 's',
+                    icon: 'mdi:spray',
+                    entity_category: 'config',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Misting Off-Interval (Number Entity)
+            this._publish(
+                `${discoveryPrefix}/number/${valveId}_ch${ch}_mist_off/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_mist_off', { ch }),
+                    unique_id: `diivoo_${valveId}_mist_off_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].intervalOffSeconds }}`,
+                    command_topic: `diivoo/${valveId}/ch/${ch}/mist_off/set`,
+                    min: 1,
+                    max: 3600,
+                    step: 1,
+                    unit_of_measurement: 's',
+                    icon: 'mdi:spray',
+                    entity_category: 'config',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Water Consumption (Diagnostic Sensor)
+            this._publish(
+                `${discoveryPrefix}/sensor/${valveId}_ch${ch}_water_consumption/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_water_consumption', { ch }),
+                    unique_id: `diivoo_${valveId}_water_consumption_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].lastWaterConsumption }}`,
+                    device_class: 'water',
+                    unit_of_measurement: 'mL',
+                    state_class: 'measurement',
+                    entity_category: 'diagnostic',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Last Run Duration (Diagnostic Sensor)
+            this._publish(
+                `${discoveryPrefix}/sensor/${valveId}_ch${ch}_last_duration/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_last_duration', { ch }),
+                    unique_id: `diivoo_${valveId}_last_duration_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].lastElapsedSeconds }}`,
+                    device_class: 'duration',
+                    unit_of_measurement: 's',
+                    entity_category: 'diagnostic',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Last Event Timestamp (Diagnostic Sensor)
+            this._publish(
+                `${discoveryPrefix}/sensor/${valveId}_ch${ch}_last_event/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_last_event', { ch }),
+                    unique_id: `diivoo_${valveId}_last_event_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].lastEventDate }}`,
+                    device_class: 'timestamp',
+                    entity_category: 'diagnostic',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Target Runtime (Diagnostic Sensor)
+            this._publish(
+                `${discoveryPrefix}/sensor/${valveId}_ch${ch}_target_runtime/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_target_runtime', { ch }),
+                    unique_id: `diivoo_${valveId}_target_runtime_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].targetRuntime }}`,
+                    device_class: 'duration',
+                    unit_of_measurement: 's',
+                    entity_category: 'diagnostic',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Schedules (JSON Sensor)
+            this._publish(
+                `${discoveryPrefix}/sensor/${valveId}_ch${ch}_schedules/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_schedules', { ch }),
+                    unique_id: `diivoo_${valveId}_schedules_${ch}`,
+                    state_topic: stateTopic,
+                    value_template: `{{ value_json.channels['${ch}'].scheduleCount }} schedules`,
+                    json_attributes_topic: `diivoo/${valveId}/ch/${ch}/schedules/attributes`,
+                    icon: 'mdi:calendar-clock',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
+
+            // Valve Entity (Water)
+            this._publish(
+                `${discoveryPrefix}/valve/${valveId}_ch${ch}/config`,
+                JSON.stringify({
+                    name: t(this.strings, 'valve_water', { ch }),
+                    unique_id: `diivoo_${valveId}_valve_${ch}`,
+                    device_class: 'water',
+                    reports_position: false,
+                    state_topic: stateTopic,
+                    value_template: `{{ 'open' if value_json.channels['${ch}'].isRunning else 'closed' }}`,
+                    command_topic: `diivoo/${valveId}/valve/${ch}/cmd`,
+                    payload_open: 'OPEN',
+                    payload_close: 'CLOSE',
+                    icon: 'mdi:water-pump',
+                    device: deviceBase
+                }),
+                { retain: true }
+            );
         }
+
+        // Device-level diagnostic sensors (outside channel loop)
+
+        // Firmware Version
+        this._publish(
+            `${discoveryPrefix}/sensor/${valveId}_firmware/config`,
+            JSON.stringify({
+                name: t(this.strings, 'valve_firmware'),
+                unique_id: `diivoo_${valveId}_firmware`,
+                state_topic: stateTopic,
+                value_template: '{{ value_json.firmwareVersion }}',
+                icon: 'mdi:chip',
+                entity_category: 'diagnostic',
+                device: deviceBase
+            }),
+            { retain: true }
+        );
+
+        // Hardware Revision
+        this._publish(
+            `${discoveryPrefix}/sensor/${valveId}_hw_revision/config`,
+            JSON.stringify({
+                name: t(this.strings, 'valve_hw_revision'),
+                unique_id: `diivoo_${valveId}_hw_revision`,
+                state_topic: stateTopic,
+                value_template: '{{ value_json.hardwareRevision }}',
+                icon: 'mdi:information-outline',
+                entity_category: 'diagnostic',
+                device: deviceBase
+            }),
+            { retain: true }
+        );
+
+        // RSSI
+        this._publish(
+            `${discoveryPrefix}/sensor/${valveId}_rssi/config`,
+            JSON.stringify({
+                name: t(this.strings, 'valve_rssi'),
+                unique_id: `diivoo_${valveId}_rssi`,
+                state_topic: stateTopic,
+                value_template: '{{ value_json.bestRssi }}',
+                device_class: 'signal_strength',
+                unit_of_measurement: 'dBm',
+                entity_category: 'diagnostic',
+                device: deviceBase
+            }),
+            { retain: true }
+        );
     }
 
     publishDeviceState(updateData) {
         const valveId = updateData.valveId;
-        const topic = `diivoo/${valveId}/state`;
+        const device = this.hub.devices.get(valveId);
 
         this.publishAutoDiscovery(updateData.state);
+        this._publish(`diivoo/${valveId}/state`, JSON.stringify(updateData.state));
 
-        const payload = JSON.stringify(updateData.state);
-        this._publish(topic, payload);
+        // Publish schedule attributes after state
+        if (device) {
+            this.publishScheduleAttributes(device);
+        }
+    }
+
+    publishScheduleAttributes(device) {
+        for (let ch = 1; ch <= (device.channelCount || 0); ch++) {
+            const channel = device.channels?.[ch];
+            const schedules = Array.isArray(channel?.schedules) ? channel.schedules : [];
+            this._publish(
+                `diivoo/${device.valveId}/ch/${ch}/schedules/attributes`,
+                JSON.stringify({ schedules }),
+                { retain: true }
+            );
+        }
     }
 
     publishAllDeviceStates() {
@@ -700,6 +948,197 @@ class MqttBridge {
                 console.error(`[MQTT] Rain delay ping failed for valve ${valveId}: ${err.message}`);
             });
 
+            return;
+        }
+
+        // --------------------------------------------------------
+        // Channel Config: diivoo/{valveId}/ch/{channelId}/default_duration/set
+        // --------------------------------------------------------
+        if (parts.length === 6 && parts[0] === 'diivoo' && parts[2] === 'ch'
+            && parts[4] === 'default_duration' && parts[5] === 'set') {
+            const valveId = parseInt(parts[1], 10);
+            const channelId = parseInt(parts[3], 10);
+            const device = this.hub.devices.get(valveId);
+            if (!device) return;
+
+            const channel = device.channels?.[channelId];
+            if (!channel) return;
+            if (!channel.settings) {
+                channel.settings = { durationSeconds: 600, intervalOnSeconds: 10, intervalOffSeconds: 30, rainDelayDate: null };
+            }
+
+            const value = Math.round(parseFloat(raw.trim()));
+            if (!Number.isFinite(value) || value < 1 || value > 65535) {
+                console.warn(`[MQTT] Invalid default_duration: ${raw}`);
+                this.publishDeviceState({ valveId, state: device.getLiveState() });
+                return;
+            }
+
+            channel.settings.durationSeconds = value;
+            device._notifyStateChange('default-duration-mqtt');
+            device.sendPingTrigger(null, 2, 0x03).catch(err => {
+                console.error(`[MQTT] Config ping failed for valve ${valveId}: ${err.message}`);
+            });
+            return;
+        }
+
+        // --------------------------------------------------------
+        // Channel Config: diivoo/{valveId}/ch/{channelId}/mist_on/set
+        // --------------------------------------------------------
+        if (parts.length === 6 && parts[0] === 'diivoo' && parts[2] === 'ch'
+            && parts[4] === 'mist_on' && parts[5] === 'set') {
+            const valveId = parseInt(parts[1], 10);
+            const channelId = parseInt(parts[3], 10);
+            const device = this.hub.devices.get(valveId);
+            if (!device) return;
+
+            const channel = device.channels?.[channelId];
+            if (!channel) return;
+            if (!channel.settings) {
+                channel.settings = { durationSeconds: 600, intervalOnSeconds: 10, intervalOffSeconds: 30, rainDelayDate: null };
+            }
+
+            const value = Math.round(parseFloat(raw.trim()));
+            if (!Number.isFinite(value) || value < 1 || value > 3600) {
+                console.warn(`[MQTT] Invalid mist_on: ${raw}`);
+                this.publishDeviceState({ valveId, state: device.getLiveState() });
+                return;
+            }
+
+            channel.settings.intervalOnSeconds = value;
+            device._notifyStateChange('mist-on-mqtt');
+            device.sendPingTrigger(null, 2, 0x03).catch(err => {
+                console.error(`[MQTT] Config ping failed for valve ${valveId}: ${err.message}`);
+            });
+            return;
+        }
+
+        // --------------------------------------------------------
+        // Channel Config: diivoo/{valveId}/ch/{channelId}/mist_off/set
+        // --------------------------------------------------------
+        if (parts.length === 6 && parts[0] === 'diivoo' && parts[2] === 'ch'
+            && parts[4] === 'mist_off' && parts[5] === 'set') {
+            const valveId = parseInt(parts[1], 10);
+            const channelId = parseInt(parts[3], 10);
+            const device = this.hub.devices.get(valveId);
+            if (!device) return;
+
+            const channel = device.channels?.[channelId];
+            if (!channel) return;
+            if (!channel.settings) {
+                channel.settings = { durationSeconds: 600, intervalOnSeconds: 10, intervalOffSeconds: 30, rainDelayDate: null };
+            }
+
+            const value = Math.round(parseFloat(raw.trim()));
+            if (!Number.isFinite(value) || value < 1 || value > 3600) {
+                console.warn(`[MQTT] Invalid mist_off: ${raw}`);
+                this.publishDeviceState({ valveId, state: device.getLiveState() });
+                return;
+            }
+
+            channel.settings.intervalOffSeconds = value;
+            device._notifyStateChange('mist-off-mqtt');
+            device.sendPingTrigger(null, 2, 0x03).catch(err => {
+                console.error(`[MQTT] Config ping failed for valve ${valveId}: ${err.message}`);
+            });
+            return;
+        }
+
+        // --------------------------------------------------------
+        // Schedules: diivoo/{valveId}/ch/{channelId}/schedules/set
+        // --------------------------------------------------------
+        if (parts.length === 6 && parts[0] === 'diivoo' && parts[2] === 'ch'
+            && parts[4] === 'schedules' && parts[5] === 'set') {
+            const valveId = parseInt(parts[1], 10);
+            const channelId = parseInt(parts[3], 10);
+            const device = this.hub.devices.get(valveId);
+            if (!device) return;
+
+            const channel = device.channels?.[channelId];
+            if (!channel) return;
+
+            const parsed = this._safeJsonParse(raw);
+            if (!Array.isArray(parsed)) {
+                console.warn(`[MQTT] Invalid schedules payload (not array): ${raw}`);
+                this.publishDeviceState({ valveId, state: device.getLiveState() });
+                this.publishScheduleAttributes(device);
+                return;
+            }
+
+            let normalized;
+            try {
+                normalized = parsed.map(item => normalizeSchedule(item || {}));
+            } catch (err) {
+                console.warn(`[MQTT] Schedule normalization error: ${err.message}`);
+                this.publishDeviceState({ valveId, state: device.getLiveState() });
+                this.publishScheduleAttributes(device);
+                return;
+            }
+
+            const otherCount = countTotalSchedules(device.channels, channelId);
+            if (otherCount + normalized.length > 6) {
+                console.warn(`[MQTT] Schedule limit exceeded: ${otherCount} existing + ${normalized.length} new > 6`);
+                this.publishDeviceState({ valveId, state: device.getLiveState() });
+                this.publishScheduleAttributes(device);
+                return;
+            }
+
+            channel.schedules = normalized;
+            device._notifyStateChange('schedules-mqtt');
+            device.sendPingTrigger(null, 2, 0x03).catch(err => {
+                console.error(`[MQTT] Config ping failed for valve ${valveId}: ${err.message}`);
+            });
+            return;
+        }
+
+        // --------------------------------------------------------
+        // Valve Entity: diivoo/{valveId}/valve/{channelId}/cmd
+        // --------------------------------------------------------
+        if (parts.length === 5 && parts[0] === 'diivoo' && parts[2] === 'valve' && parts[4] === 'cmd') {
+            const valveId = parseInt(parts[1], 10);
+            const channelId = parseInt(parts[3], 10);
+            const device = this.hub.devices.get(valveId);
+            if (!device) return;
+
+            const channel = device.channels?.[channelId];
+            if (!channel) return;
+
+            const trimmed = raw.trim();
+            const upper = trimmed.toUpperCase();
+
+            try {
+                if (upper === 'CLOSE') {
+                    await device.valve(channelId).off();
+                    return;
+                }
+
+                if (upper === 'OPEN') {
+                    const duration = channel.settings?.durationSeconds || 600;
+                    await device.valve(channelId).on(duration);
+                    return;
+                }
+
+                // Try parsing as JSON: {"command": "OPEN", "duration": 300}
+                const parsedCmd = this._safeJsonParse(trimmed);
+                if (parsedCmd && typeof parsedCmd === 'object') {
+                    const cmd = String(parsedCmd.command || '').toUpperCase();
+                    if (cmd === 'OPEN') {
+                        const dur = Math.max(1, Math.min(65535,
+                            Math.round(Number(parsedCmd.duration) || channel.settings?.durationSeconds || 600)
+                        ));
+                        await device.valve(channelId).on(dur);
+                        return;
+                    }
+                    if (cmd === 'CLOSE') {
+                        await device.valve(channelId).off();
+                        return;
+                    }
+                }
+
+                // Unrecognized payload — silently discard
+            } catch (err) {
+                console.error(`[MQTT] Valve cmd failed: ${err.message}`);
+            }
             return;
         }
 

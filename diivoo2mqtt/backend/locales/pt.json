@@ -11,5 +11,17 @@
   "gateway_refresh_version": "Gateway Atualizar versão",
   "firmware_update": "Atualização de firmware",
   "valve_rain_delay": "Válvula {ch} Atraso de chuva",
-  "valve_rain_delay_until": "Válvula {ch} Atraso de chuva até"
+  "valve_rain_delay_until": "Válvula {ch} Atraso de chuva até",
+  "valve_default_duration": "Default Duration Ch{ch}",
+  "valve_mist_on": "Mist On Ch{ch}",
+  "valve_mist_off": "Mist Off Ch{ch}",
+  "valve_schedules": "Schedules Ch{ch}",
+  "valve_water": "Valve Ch{ch}",
+  "valve_water_consumption": "Water Consumption Ch{ch}",
+  "valve_last_duration": "Last Duration Ch{ch}",
+  "valve_last_event": "Last Event Ch{ch}",
+  "valve_target_runtime": "Target Runtime Ch{ch}",
+  "valve_firmware": "Firmware",
+  "valve_hw_revision": "Hardware Revision",
+  "valve_rssi": "Signal Strength"
 }

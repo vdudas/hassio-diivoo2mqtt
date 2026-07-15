@@ -5,12 +5,15 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "node --test core/*.test.js"
+    "test": "node --test core/*.test.js interfaces/*.test.js"
   },
   "dependencies": {
     "express": "^5.2.1",
     "mqtt": "^5.15.1",
     "multicast-dns": "^7.2.5",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "fast-check": "^4.9.0"
   }
 }
