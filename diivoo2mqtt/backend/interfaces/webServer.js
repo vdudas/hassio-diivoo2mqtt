@@ -4,13 +4,17 @@ const { Server } = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 
+const MAX_PROTOCOL_DURATION_SECONDS = 0xFFFF;
+const MAX_PROTOCOL_DURATION_MINUTES = Math.floor(MAX_PROTOCOL_DURATION_SECONDS / 60);
+
 class WebServer {
     constructor(hub, config) {
         this.hub = hub;
         this.app = express();
         this.server = http.createServer(this.app);
 
-        this.otaDir = config.otaDir || path.join(__dirname, '../ota');
+        this.port = config.port;
+        this.otaDir = config.otaDir || this.hub.otaManager?.otaDir || path.join(__dirname, '../public/ota');
         this.otaBaseUrl = (config.otaBaseUrl || process.env.OTA_BASE_URL || '').replace(/\/+$/, '');
 
         const isDev = process.env.NODE_ENV !== 'production';
@@ -22,8 +26,12 @@ class WebServer {
             }
         } : {});
 
+        this.app.get('/health', (_req, res) => {
+            res.json({ status: 'ok', timestamp: Date.now() });
+        });
+
         this.app.get('/api/health', (_req, res) => {
-            res.json({ ok: true });
+            res.json({ status: 'ok', timestamp: Date.now() });
         });
 
         this.app.get('/api/runtime-config', (req, res) => {
@@ -126,20 +134,10 @@ class WebServer {
             }
 
             // Gateways Status mitsenden
-            const gws = [];
-            for (const gw of this.hub.gateways.values()) {
-                gws.push({
-                    id: gw.id,
-                    ip: gw.ip,
-                    port: gw.port,
-                    isConnected: gw.isConnected,
-                    version: gw.lastVersion?.version || null,
-                    model: gw.lastVersion?.model || null,
-                    lastSeenAt: gw.lastSeenAt,
-                    otaUpdate: this.hub.otaManager ? this.hub.otaManager.getUpdateInfo(gw.id) : null
-                });
-            }
-            socket.emit('gatewaysState', gws);
+            socket.emit(
+                'gatewaysState',
+                Array.from(this.hub.gateways.values()).map((gateway) => this._serializeGateway(gateway))
+            );
 
             socket.on('app:ping', (payload, ack) => {
                 if (typeof ack === 'function') {
@@ -161,41 +159,17 @@ class WebServer {
 
             // --- Gateway & OTA Events ---
             socket.on('getGateways', () => {
-                const gws = [];
-                for (const gw of this.hub.gateways.values()) {
-                    gws.push({
-                        id: gw.id,
-                        ip: gw.ip,
-                        port: gw.port,
-                        isConnected: gw.isConnected,
-                        version: gw.lastVersion?.version || null,
-                        model: gw.lastVersion?.model || null,
-                        lastSeenAt: gw.lastSeenAt,
-                        otaUpdate: this.hub.otaManager ? this.hub.otaManager.getUpdateInfo(gw.id) : null
-                    });
-                }
-                socket.emit('gatewaysState', gws);
+                socket.emit(
+                    'gatewaysState',
+                    Array.from(this.hub.gateways.values()).map((gateway) => this._serializeGateway(gateway))
+                );
             });
 
 
 
             socket.on('triggerOtaUpdate', ({ gatewayId }) => {
                 if (this.hub.otaManager) {
-                    const os = require('os');
-                    let addonIp = '127.0.0.1';
-                    const interfaces = os.networkInterfaces();
-                    for (const name of Object.keys(interfaces)) {
-                        for (const net of interfaces[name]) {
-                            if (net.family === 'IPv4' && !net.internal) {
-                                addonIp = net.address;
-                                break;
-                            }
-                        }
-                    }
-
-                    const port = process.env.WEB_PORT || 8099;
-
-                    this.hub.otaManager.triggerUpdate(gatewayId, addonIp, port).catch(err => {
+                    this.hub.otaManager.triggerUpdate(gatewayId).catch(err => {
                         console.error(`[Web] OTA error: ${err.message}`);
                     });
                 }
@@ -216,9 +190,68 @@ class WebServer {
                 }
             });
 
-            socket.on('removeManualGateway', ({ id }) => {
+            const removeGateway = ({ id }) => {
                 if (this.hub && typeof this.hub._removeDynamicGateway === 'function') {
                     this.hub._removeDynamicGateway(id);
+                }
+            };
+            socket.on('removeGateway', removeGateway);
+            socket.on('removeManualGateway', removeGateway); // Backward compatibility for older frontends.
+
+            socket.on('renameGateway', ({ gatewayId, alias }, ack) => {
+                try {
+                    const ok = this.hub.renameGateway(gatewayId, alias);
+                    const result = ok
+                        ? { ok: true, gatewayId, alias: this.hub.getGateway(gatewayId)?.alias || null }
+                        : { ok: false, gatewayId, error: 'Gateway not found' };
+                    if (typeof ack === 'function') ack(result);
+                } catch (err) {
+                    if (typeof ack === 'function') ack({ ok: false, gatewayId, error: err.message });
+                }
+            });
+
+            socket.on('gatewaySetLed', async ({ gatewayId, state }, ack) => {
+                try {
+                    const normalizedState = String(state || '').toUpperCase();
+                    if (!['ON', 'OFF'].includes(normalizedState)) throw new Error('Invalid LED state');
+                    await this.hub.setGatewayLed(gatewayId, normalizedState === 'ON');
+                    if (typeof ack === 'function') ack({ ok: true, gatewayId, state: normalizedState });
+                } catch (err) {
+                    console.error(`[Web] LED command failed (${gatewayId}): ${err.message}`);
+                    if (typeof ack === 'function') ack({ ok: false, gatewayId, error: err.message });
+                }
+            });
+
+            socket.on('gatewayPortal', async ({ gatewayId }, ack) => {
+                try {
+                    await this.hub.startGatewayPortal(gatewayId);
+                    if (typeof ack === 'function') ack({ ok: true, gatewayId });
+                } catch (err) {
+                    console.error(`[Web] Portal command failed (${gatewayId}): ${err.message}`);
+                    if (typeof ack === 'function') ack({ ok: false, gatewayId, error: err.message });
+                }
+            });
+
+            socket.on('gatewayClearWifi', async ({ gatewayId }, ack) => {
+                try {
+                    await this.hub.clearGatewayWifi(gatewayId);
+                    if (typeof ack === 'function') ack({ ok: true, gatewayId });
+                } catch (err) {
+                    console.error(`[Web] Clear WiFi command failed (${gatewayId}): ${err.message}`);
+                    if (typeof ack === 'function') ack({ ok: false, gatewayId, error: err.message });
+                }
+            });
+
+            socket.on('gatewayRefreshVersion', async ({ gatewayId }, ack) => {
+                try {
+                    const version = await this.hub.getGatewayVersion(gatewayId);
+                    console.log(
+                        `[Web] Gateway ${gatewayId} firmware version refreshed: ${version?.version || 'unknown'}`
+                    );
+                    if (typeof ack === 'function') ack({ ok: true, gatewayId, version });
+                } catch (err) {
+                    console.error(`[Web] Version refresh failed (${gatewayId}): ${err.message}`);
+                    if (typeof ack === 'function') ack({ ok: false, gatewayId, error: err.message });
                 }
             });
 
@@ -263,7 +296,15 @@ class WebServer {
                     let result = null;
 
                     if (state === 'ON') {
-                        const seconds = Math.max(1, Number(duration) || 600);
+                        const channel = this._getChannelOrThrow(device, Number(channelId));
+                        const requestedDuration = Number(duration);
+                        const defaultDuration = Number(channel.settings.durationSeconds);
+                        const seconds = Number.isFinite(requestedDuration) && requestedDuration > 0
+                            ? Math.min(MAX_PROTOCOL_DURATION_SECONDS, Math.round(requestedDuration))
+                            : Math.min(
+                                MAX_PROTOCOL_DURATION_SECONDS,
+                                Math.max(1, Number.isFinite(defaultDuration) ? Math.round(defaultDuration) : 600)
+                            );
                         result = await device.valve(Number(channelId)).on(seconds);
                     } else if (state === 'OFF') {
                         result = await device.valve(Number(channelId)).off();
@@ -369,6 +410,7 @@ class WebServer {
                         : [];
 
                     channel.schedules = normalizedSchedules;
+                    this.hub.deviceStore.save(this.hub.devices);
 
                     await this._triggerDeviceRefresh(device, Number(channelId), 'schedules-save');
 
@@ -421,6 +463,7 @@ class WebServer {
                     } else {
                         channel.schedules.push(normalizedSchedule);
                     }
+                    this.hub.deviceStore.save(this.hub.devices);
 
                     await this._triggerDeviceRefresh(device, Number(channelId), 'schedule-save');
 
@@ -464,6 +507,7 @@ class WebServer {
                     const before = Array.isArray(channel.schedules) ? channel.schedules.length : 0;
                     channel.schedules = (channel.schedules || []).filter((item) => item.id !== scheduleId);
                     const after = channel.schedules.length;
+                    this.hub.deviceStore.save(this.hub.devices);
 
                     await this._triggerDeviceRefresh(device, Number(channelId), 'schedule-delete');
 
@@ -538,8 +582,17 @@ class WebServer {
                     const { rawJson } = payload;
                     if (!rawJson) throw new Error('No JSON provided');
 
-                    // Validierung: Versuche es zu parsen
-                    JSON.parse(rawJson);
+                    const parsed = JSON.parse(rawJson);
+                    const devices = Array.isArray(parsed) ? parsed : parsed?.devices;
+                    if (!Array.isArray(devices)) {
+                        throw new Error('Expected a device array or an object containing a devices array');
+                    }
+                    if (parsed && !Array.isArray(parsed) && parsed.hubId != null) {
+                        const hubId = Number(parsed.hubId);
+                        if (!Number.isInteger(hubId) || hubId < 0 || hubId > 0xFFFFFFFF) {
+                            throw new Error('Invalid hubId');
+                        }
+                    }
 
                     // Speichern
                     fs.writeFileSync(this.hub.deviceStore.filePath, rawJson, 'utf8');
@@ -562,28 +615,39 @@ class WebServer {
             this.io.emit('deviceUpdate', updateData.state);
         });
 
+        this.hub.on('configSyncState', (state) => {
+            this.io.emit('configSyncState', state);
+        });
+
         this.hub.on('gatewayStateUpdate', () => {
-            const gws = [];
-            for (const gw of this.hub.gateways.values()) {
-                gws.push({
-                    id: gw.id,
-                    ip: gw.ip,
-                    port: gw.port,
-                    isConnected: gw.isConnected,
-                    version: gw.lastVersion?.version || null,
-                    model: gw.lastVersion?.model || null,
-                    lastSeenAt: gw.lastSeenAt,
-                    otaUpdate: this.hub.otaManager ? this.hub.otaManager.getUpdateInfo(gw.id) : null
-                });
-            }
-            this.io.emit('gatewaysState', gws);
+            this.io.emit(
+                'gatewaysState',
+                Array.from(this.hub.gateways.values()).map((gateway) => this._serializeGateway(gateway))
+            );
         });
 
         this.hub.on('diagnosticLogsUpdate', broadcastDiagnosticSummary);
 
-        this.server.listen(config.port, '0.0.0.0', () => {
-            console.log(`[Web] Frontend running on port ${config.port}`);
+        this.server.listen(this.port, '0.0.0.0', () => {
+            console.log(`[Web] Frontend running on port ${this.port}`);
         });
+    }
+
+    _serializeGateway(gateway) {
+        return {
+            id: gateway.id,
+            alias: gateway.alias || null,
+            ip: gateway.ip,
+            port: gateway.port,
+            isConnected: gateway.isConnected,
+            ledState: gateway.ledState || 'OFF',
+            buttonPressed: !!gateway.buttonPressed,
+            version: gateway.lastVersion?.version || null,
+            model: gateway.lastVersion?.model || null,
+            mac: gateway.lastVersion?.mac || null,
+            lastSeenAt: gateway.lastSeenAt,
+            otaUpdate: this.hub.otaManager ? this.hub.otaManager.getUpdateInfo(gateway.id) : null,
+        };
     }
 
     _getChannelOrThrow(device, channelId) {
@@ -610,9 +674,14 @@ class WebServer {
 
     _serializeChannelConfig(device, channelId) {
         const channel = this._getChannelOrThrow(device, channelId);
-        const durationSeconds = Math.max(1, Number(channel.settings.durationSeconds) || 600);
+        const rawDurationSeconds = Number(channel.settings.durationSeconds);
+        const durationSeconds = Math.min(
+            MAX_PROTOCOL_DURATION_SECONDS,
+            Math.max(1, Number.isFinite(rawDurationSeconds) ? Math.round(rawDurationSeconds) : 600)
+        );
 
         return {
+            displayName: typeof channel.displayName === 'string' ? channel.displayName : '',
             defaultOpenSeconds: durationSeconds,
             defaultOpenMinutes: Math.max(1, Math.round(durationSeconds / 60)),
             intervalOnSeconds: Math.max(1, Number(channel.settings.intervalOnSeconds) || 10),
@@ -627,6 +696,14 @@ class WebServer {
     _applyChannelConfig(device, channelId, config) {
         const channel = this._getChannelOrThrow(device, channelId);
 
+        if (Object.prototype.hasOwnProperty.call(config, 'displayName')) {
+            const displayName = config.displayName == null ? '' : String(config.displayName).trim();
+            if (displayName.length > 80) {
+                throw new Error('Valve name must be at most 80 characters.');
+            }
+            channel.displayName = displayName;
+        }
+
         if (config.defaultOpenSeconds != null || config.defaultOpenMinutes != null) {
             const seconds = config.defaultOpenSeconds != null
                 ? Number(config.defaultOpenSeconds)
@@ -636,7 +713,7 @@ class WebServer {
                 throw new Error('Invalid default open duration');
             }
 
-            channel.settings.durationSeconds = Math.min(24 * 60 * 60, Math.round(seconds));
+            channel.settings.durationSeconds = Math.min(MAX_PROTOCOL_DURATION_SECONDS, Math.round(seconds));
         }
 
         if (config.intervalOnSeconds != null) {
@@ -669,11 +746,12 @@ class WebServer {
     }
 
     async _triggerDeviceRefresh(device, channelId, reason = 'config-change') {
-        if (!device || typeof device.sendPingTrigger !== 'function') {
-            return;
-        }
-        console.log(`[Web] Sending config-refresh ping (0x20/03) to valve ${device.valveId}, channel ${channelId} due to ${reason}`);
-        const followUps = await device.sendPingTrigger(null, 2, 0x03);
+        if (!device) return;
+
+        console.log(`[Web] Queueing config-refresh ping (0x20/03) for valve ${device.valveId}, channel ${channelId} due to ${reason}`);
+        const followUps = typeof device.queueConfigRefresh === 'function'
+            ? await device.queueConfigRefresh(reason)
+            : await device.sendPingTrigger(null, 2, 0x03);
         if (Array.isArray(followUps) && followUps.length > 0) {
             console.log(`[Web] Config refresh triggered on valve ${device.valveId} - device is pulling updated config.`);
         } else {
@@ -683,11 +761,21 @@ class WebServer {
 
     _normalizeSchedule(schedule) {
         const mode = schedule.mode === 'mist' ? 'mist' : 'normal';
-        const startTime = typeof schedule.startTime === 'string' && /^\d{2}:\d{2}$/.test(schedule.startTime)
+        const startMatch = typeof schedule.startTime === 'string'
+            ? schedule.startTime.match(/^(\d{2}):(\d{2})$/)
+            : null;
+        const startTime = startMatch && Number(startMatch[1]) <= 23 && Number(startMatch[2]) <= 59
             ? schedule.startTime
             : '06:00';
 
-        const durationMinutes = Math.max(1, Math.min(1440, Number(schedule.durationMinutes) || 10));
+        const rawDurationMinutes = Number(schedule.durationMinutes);
+        const durationMinutes = Math.max(
+            1,
+            Math.min(
+                MAX_PROTOCOL_DURATION_MINUTES,
+                Number.isFinite(rawDurationMinutes) ? Math.round(rawDurationMinutes) : 10
+            )
+        );
         const repeat = ['daily', 'odd', 'even', 'custom'].includes(schedule.repeat)
             ? schedule.repeat
             : 'daily';

@@ -74,14 +74,33 @@
         >
           <div class="flex flex-wrap items-start justify-between gap-3 max-md:flex-col max-md:items-stretch">
             <div>
-              <strong class="block text-[22px] leading-[1.1] tracking-[-0.03em]">
-                Gateway {{ gw.id }}
-              </strong>
-              <div class="theme-text-muted mt-1.5 text-sm leading-[1.4]">
-                {{ gw.model || 'Unknown Model' }} · {{ gw.ip }}:{{ gw.port }}
-              </div>
+              <template v-if="renamingGatewayId === gw.id">
+                <form class="flex items-center gap-2" @submit.prevent="commitGatewayRename(gw.id)">
+                  <input
+                    v-model="renameGatewayInput"
+                    class="theme-input w-full max-w-xs rounded-xl border px-3 py-1.5 text-[18px] font-extrabold tracking-[-0.03em]"
+                    maxlength="80"
+                    placeholder="Gateway name"
+                    autofocus
+                    @keydown.esc.prevent="cancelGatewayRename"
+                  />
+                  <button type="submit" class="theme-button-primary rounded-full border px-3 py-1.5 text-[13px] font-bold">Save</button>
+                  <button type="button" class="theme-button-secondary rounded-full border px-3 py-1.5 text-[13px] font-bold" @click="cancelGatewayRename">Cancel</button>
+                </form>
+              </template>
+              <template v-else>
+                <button type="button" class="text-left" @click="toggleGatewayCollapsed(gw.id)">
+                  <strong class="block text-[22px] leading-[1.1] tracking-[-0.03em]">
+                    {{ gw.alias || `Gateway ${gw.id}` }}
+                  </strong>
+                  <div class="theme-text-muted mt-1.5 text-sm leading-[1.4]">
+                    <span v-if="gw.alias">ID: {{ gw.id }} · </span>{{ gw.model || 'Unknown Model' }} · {{ gw.ip }}:{{ gw.port }}
+                    <span class="ml-2">{{ isGatewayCollapsed(gw.id) ? '▼ expand' : '▲ collapse' }}</span>
+                  </div>
+                </button>
+              </template>
             </div>
-            
+
             <div class="flex flex-wrap gap-2 max-md:w-full">
               <div
                 class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[13px] font-bold max-md:flex-1 max-md:justify-center"
@@ -98,18 +117,69 @@
               </div>
               <button
                 v-if="gw.otaUpdate && gw.otaUpdate.hasUpdate"
-                @click="triggerOtaUpdate(gw.id)"
+                type="button"
                 class="theme-button-primary inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold max-md:flex-1 max-md:justify-center transition hover:-translate-y-[1px]"
+                @click="triggerOtaUpdate(gw.id)"
               >
                 Update to {{ gw.otaUpdate.latestVersion }}
               </button>
               <button
-                v-if="gw.id.startsWith('manual-')"
-                @click="removeGateway(gw.id)"
+                v-if="renamingGatewayId !== gw.id"
+                type="button"
+                class="theme-button-secondary inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold max-md:flex-1 max-md:justify-center transition hover:-translate-y-[1px]"
+                @click="startGatewayRename(gw)"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
                 class="theme-button-danger inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold max-md:flex-1 max-md:justify-center transition hover:-translate-y-[1px]"
+                @click="removeGateway(gw.id)"
               >
                 Delete
               </button>
+            </div>
+          </div>
+
+          <div v-if="!isGatewayCollapsed(gw.id)" class="theme-soft flex flex-wrap gap-2 rounded-[20px] border p-3">
+            <div class="theme-chip-neutral inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold">
+              Button: {{ gw.buttonPressed ? 'Pressed' : 'Released' }}
+            </div>
+            <button
+              type="button"
+              :disabled="!gw.isConnected"
+              class="inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40"
+              :class="gw.ledState === 'ON' ? 'theme-chip-success' : 'theme-chip-neutral'"
+              @click="gatewaySetLed(gw.id, gw.ledState === 'ON' ? 'OFF' : 'ON')"
+            >
+              LED: {{ gw.ledState === 'ON' ? 'On' : 'Off' }}
+            </button>
+            <button
+              type="button"
+              :disabled="!gw.isConnected"
+              class="theme-button-secondary inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40"
+              @click="gatewayPortal(gw.id)"
+            >
+              Open WiFi Portal
+            </button>
+            <button
+              type="button"
+              :disabled="!gw.isConnected"
+              class="theme-button-secondary inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40"
+              @click="gatewayRefreshVersion(gw.id)"
+            >
+              Refresh Version
+            </button>
+            <button
+              type="button"
+              :disabled="!gw.isConnected"
+              class="theme-button-danger inline-flex items-center rounded-full border px-3 py-2 text-[13px] font-bold transition hover:-translate-y-[1px] disabled:cursor-not-allowed disabled:opacity-40"
+              @click="gatewayClearWifi(gw.id)"
+            >
+              Clear WiFi
+            </button>
+            <div v-if="gatewayActionMessages[gw.id]" class="theme-text-muted w-full px-1 pt-1 text-xs font-bold">
+              {{ gatewayActionMessages[gw.id] }}
             </div>
           </div>
         </article>
@@ -178,7 +248,7 @@
           class="theme-card grid gap-4 rounded-[28px] border p-4"
         >
           <div class="flex flex-wrap items-start justify-between gap-3 max-md:flex-col max-md:items-stretch">
-            <div class="min-w-0 flex-1">
+            <div>
               <template v-if="renamingDeviceId === device.valveId">
                 <form class="flex items-center gap-2" @submit.prevent="commitRename(device.valveId)">
                   <input
@@ -196,7 +266,7 @@
                 </div>
               </template>
               <template v-else>
-                <button type="button" class="min-w-0 text-left" @click="toggleDeviceCollapsed(device.valveId)">
+                <button type="button" class="text-left" @click="toggleDeviceCollapsed(device.valveId)">
                   <strong class="block text-[22px] leading-[1.1] tracking-[-0.03em]">
                     {{ device.alias || device.model || 'Irrigation device' }}
                   </strong>
@@ -226,6 +296,19 @@
                 Battery {{ device.battery || 'Unknown' }}
               </div>
 
+              <div
+                v-if="configSyncStateFor(device.valveId)"
+                class="inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[13px] font-bold max-md:flex-1 max-md:justify-center"
+                :class="configSyncChipClass(configSyncStateFor(device.valveId).status)"
+                :title="configSyncTitle(configSyncStateFor(device.valveId))"
+              >
+                <span
+                  v-if="isConfigSyncActive(configSyncStateFor(device.valveId).status)"
+                  class="h-2 w-2 animate-pulse rounded-full bg-current"
+                />
+                {{ configSyncLabel(configSyncStateFor(device.valveId)) }}
+              </div>
+
               <button
                 v-if="renamingDeviceId !== device.valveId"
                 type="button"
@@ -253,7 +336,7 @@
             >
               <div class="flex items-start justify-between gap-3 max-md:flex-col max-md:items-stretch">
                 <div class="min-w-0">
-                  <strong class="block text-lg leading-[1.1] tracking-[-0.02em]">Valve {{ channelId }}</strong>
+                  <strong class="block text-lg leading-[1.1] tracking-[-0.02em]">{{ channelDisplayName(channel, channelId) }}</strong>
                   <span class="theme-text-muted mt-1 block text-[13px] leading-[1.4]">
                     {{ channel.source || 'Manual' }}
                   </span>
@@ -485,7 +568,7 @@
                     class="theme-input min-h-11 w-full rounded-xl border px-3"
                     type="number"
                     min="1"
-                    max="1440"
+                    max="1092"
                     step="1"
                     inputmode="numeric"
                   />
@@ -589,6 +672,24 @@
         <template v-else-if="activeSheet === 'config'">
           <div class="grid gap-4">
             <div class="grid gap-3">
+              <div class="text-[15px] font-extrabold tracking-[-0.02em]">Valve name</div>
+              <div class="theme-soft grid min-w-0 gap-1.5 rounded-[18px] border px-3.5 py-3">
+                <label for="channelDisplayName" class="theme-text-muted text-xs font-bold">Custom name</label>
+                <input
+                  id="channelDisplayName"
+                  v-model="configDraft.displayName"
+                  class="theme-input min-h-11 w-full rounded-xl border px-3"
+                  type="text"
+                  maxlength="80"
+                  :placeholder="`Valve ${activeChannel?.channelId}`"
+                />
+                <div class="theme-text-muted text-xs leading-[1.4]">
+                  The name is also published to Home Assistant without changing the entity identity.
+                </div>
+              </div>
+            </div>
+
+            <div class="grid gap-3">
               <div class="text-[15px] font-extrabold tracking-[-0.02em]">Default runtime</div>
               <div class="grid gap-2.5 md:grid-cols-2">
                 <div class="theme-soft grid min-w-0 gap-1.5 rounded-[18px] border px-3.5 py-3">
@@ -601,7 +702,7 @@
                     class="theme-input min-h-11 w-full rounded-xl border px-3"
                     type="number"
                     min="1"
-                    max="1440"
+                    max="1092"
                     step="1"
                     inputmode="numeric"
                   />
@@ -737,14 +838,20 @@ const planDirty = ref(false)
 
 const gateways = ref([])
 const diagnosticLogs = ref([])
+const configSyncStates = ref({})
+const configSyncClearTimers = new Map()
 
 const rawJsonContent = ref('')
 const rawJsonError = ref('')
 const isRestarting = ref(false)
 
 const collapsedDevices = ref(new Set())
+const collapsedGateways = ref(new Set())
 const renamingDeviceId = ref(null)
 const renameInput = ref('')
+const renamingGatewayId = ref(null)
+const renameGatewayInput = ref('')
+const gatewayActionMessages = ref({})
 
 const planDraft = reactive({
   mode: 'normal',
@@ -760,6 +867,7 @@ const planForm = reactive({
 })
 
 const configDraft = reactive({
+  displayName: '',
   defaultOpenMinutes: 10,
   rainStopUntil: '',
 })
@@ -830,7 +938,8 @@ const activeDevice = computed(() => {
 const sheetTitle = computed(() => {
   if (activeSheet.value === 'rawEdit') return 'Database Editor'
   if (!activeChannel.value) return 'Schedule'
-  const base = `Valve ${activeChannel.value.channelId}`
+  const channel = activeDevice.value?.channels?.[activeChannel.value.channelId]
+  const base = channelDisplayName(channel, activeChannel.value.channelId)
   return activeSheet.value === 'plan' ? `${base} · Schedules` : `${base} · Settings`
 })
 
@@ -973,6 +1082,7 @@ function getDefaultChannelConfig(deviceId, channelId) {
 
   if (!channelConfigs.value[key]) {
     channelConfigs.value[key] = {
+      displayName: '',
       defaultOpenMinutes: 10,
       rainStopUntil: '',
       schedules: [],
@@ -999,7 +1109,12 @@ function cloneSchedules(items = []) {
 function mergeChannelConfigFromDevice(device) {
   for (const [channelId] of Object.entries(device.channels || {})) {
     const config = getDefaultChannelConfig(device.valveId, channelId)
-    const source = device.channelConfig?.[channelId] || device.channels?.[channelId]?.config || null
+    const liveChannel = device.channels?.[channelId]
+    const source = device.channelConfig?.[channelId] || liveChannel?.config || null
+
+    if (typeof liveChannel?.displayName === 'string') {
+      config.displayName = liveChannel.displayName
+    }
 
     if (!source) continue
 
@@ -1011,6 +1126,10 @@ function mergeChannelConfigFromDevice(device) {
 
     if (typeof source.rainStopUntil === 'string') {
       config.rainStopUntil = source.rainStopUntil
+    }
+
+    if (typeof source.displayName === 'string') {
+      config.displayName = source.displayName
     }
 
     if (Array.isArray(source.schedules)) {
@@ -1101,6 +1220,11 @@ function sortedChannels(device) {
 
 function channelCount(device) {
   return Object.keys(device.channels || {}).length
+}
+
+function channelDisplayName(channel, channelId) {
+  const customName = typeof channel?.displayName === 'string' ? channel.displayName.trim() : ''
+  return customName || `Valve ${channelId}`
 }
 
 function isBatteryLow(device) {
@@ -1214,6 +1338,67 @@ function sendValve(deviceId, channelId, action) {
   }, 2200)
 }
 
+function configSyncStateFor(valveId) {
+  return configSyncStates.value[String(valveId)] || null
+}
+
+function isConfigSyncActive(status) {
+  return ['queued', 'notifying', 'pulling'].includes(status)
+}
+
+function configSyncChipClass(status) {
+  if (status === 'idle') return 'theme-chip-success'
+  if (['no_response', 'timeout', 'failed'].includes(status)) return 'theme-chip-danger'
+  return 'theme-chip-warning'
+}
+
+function configSyncLabel(state) {
+  if (!state) return ''
+  if (state.status === 'queued') return state.pending > 1 ? `Config queued (${state.pending})` : 'Config queued'
+  if (state.status === 'notifying') return 'Notifying device…'
+  if (state.status === 'pulling') return `Device pulling… (${state.requestCount})`
+  if (state.status === 'idle') return `Pull idle · ${state.requestCount} request${state.requestCount === 1 ? '' : 's'}`
+  if (state.status === 'no_response') return 'Device did not request config'
+  if (state.status === 'timeout') return 'Config pull timed out'
+  if (state.status === 'failed') return 'Config refresh failed'
+  return 'Config status unknown'
+}
+
+function configSyncTitle(state) {
+  if (!state) return ''
+  const reason = state.reason ? `Reason: ${state.reason}. ` : ''
+  const confirmation = state.confirmed
+    ? 'The device confirmed the configuration.'
+    : 'The protocol does not provide a final configuration confirmation.'
+  return `${reason}${confirmation}`
+}
+
+function handleConfigSyncState(state) {
+  if (!state || state.valveId == null || !state.status) return
+
+  const key = String(state.valveId)
+  const existingTimer = configSyncClearTimers.get(key)
+  if (existingTimer) {
+    clearTimeout(existingTimer)
+    configSyncClearTimers.delete(key)
+  }
+
+  configSyncStates.value = {
+    ...configSyncStates.value,
+    [key]: state,
+  }
+
+  if (!isConfigSyncActive(state.status)) {
+    const timer = setTimeout(() => {
+      const next = { ...configSyncStates.value }
+      delete next[key]
+      configSyncStates.value = next
+      configSyncClearTimers.delete(key)
+    }, 8000)
+    configSyncClearTimers.set(key, timer)
+  }
+}
+
 function isDeviceCollapsed(valveId) {
   return collapsedDevices.value.has(valveId)
 }
@@ -1301,6 +1486,7 @@ function openSheet(type, deviceId, channelId) {
     planForm.mistOnSeconds = 10
     planForm.mistOffSeconds = 30
   } else {
+    configDraft.displayName = config.displayName || activeDevice.value?.channels?.[channelId]?.displayName || ''
     configDraft.defaultOpenMinutes = Math.max(1, Number(config.defaultOpenMinutes || 10))
     configDraft.rainStopUntil = toDateTimeLocalInput(config.rainStopUntil)
   }
@@ -1367,7 +1553,7 @@ function toggleWeekday(day) {
 
 function addPlanToEditor() {
   const startTime = planForm.startTime || '06:00'
-  const durationMinutes = Math.max(1, Math.min(1440, Number(planForm.durationMinutes) || 10))
+  const durationMinutes = Math.max(1, Math.min(1092, Number(planForm.durationMinutes) || 10))
   const mistOnSeconds = Math.max(1, Math.min(3600, Number(planForm.mistOnSeconds) || 10))
   const mistOffSeconds = Math.max(1, Math.min(3600, Number(planForm.mistOffSeconds) || 30))
 
@@ -1442,9 +1628,83 @@ function addManualGateway() {
 }
 
 function removeGateway(id) {
-  if (confirm(`Do you really want to remove the manual gateway ${id}?`)) {
-    socket.emit('removeManualGateway', { id })
+  if (confirm(`Do you really want to remove gateway ${id}?`)) {
+    socket.emit('removeGateway', { id })
   }
+}
+
+function isGatewayCollapsed(gatewayId) {
+  return collapsedGateways.value.has(gatewayId)
+}
+
+function toggleGatewayCollapsed(gatewayId) {
+  const next = new Set(collapsedGateways.value)
+  if (next.has(gatewayId)) next.delete(gatewayId)
+  else next.add(gatewayId)
+  collapsedGateways.value = next
+}
+
+function startGatewayRename(gateway) {
+  renamingGatewayId.value = gateway.id
+  renameGatewayInput.value = gateway.alias || ''
+}
+
+function cancelGatewayRename() {
+  renamingGatewayId.value = null
+  renameGatewayInput.value = ''
+}
+
+function commitGatewayRename(gatewayId) {
+  socket.emit('renameGateway', { gatewayId, alias: renameGatewayInput.value }, (result) => {
+    if (!result?.ok) {
+      alert(`Gateway rename failed: ${result?.error || 'Unknown error'}`)
+      return
+    }
+    renamingGatewayId.value = null
+    renameGatewayInput.value = ''
+  })
+}
+
+function gatewaySetLed(gatewayId, state) {
+  socket.emit('gatewaySetLed', { gatewayId, state }, (result) => {
+    if (!result?.ok) alert(`LED command failed: ${result?.error || 'Unknown error'}`)
+  })
+}
+
+function gatewayPortal(gatewayId) {
+  if (!confirm(`Open the WiFi configuration portal on gateway ${gatewayId}? The gateway may disconnect briefly.`)) return
+  socket.emit('gatewayPortal', { gatewayId }, (result) => {
+    if (!result?.ok) alert(`Portal command failed: ${result?.error || 'Unknown error'}`)
+  })
+}
+
+function setGatewayActionMessage(gatewayId, message) {
+  gatewayActionMessages.value = { ...gatewayActionMessages.value, [gatewayId]: message }
+  window.setTimeout(() => {
+    if (gatewayActionMessages.value[gatewayId] !== message) return
+    const next = { ...gatewayActionMessages.value }
+    delete next[gatewayId]
+    gatewayActionMessages.value = next
+  }, 6000)
+}
+
+function gatewayRefreshVersion(gatewayId) {
+  setGatewayActionMessage(gatewayId, 'Refreshing firmware version…')
+  socket.emit('gatewayRefreshVersion', { gatewayId }, (result) => {
+    if (!result?.ok) {
+      setGatewayActionMessage(gatewayId, `Version refresh failed: ${result?.error || 'Unknown error'}`)
+      return
+    }
+    const version = result.version?.version || result.version || 'response received'
+    setGatewayActionMessage(gatewayId, `Firmware version refreshed: ${version}`)
+  })
+}
+
+function gatewayClearWifi(gatewayId) {
+  if (!confirm(`Clear all WiFi credentials on gateway ${gatewayId}? It will go offline and must be configured again.`)) return
+  socket.emit('gatewayClearWifi', { gatewayId }, (result) => {
+    if (!result?.ok) alert(`Clear WiFi failed: ${result?.error || 'Unknown error'}`)
+  })
 }
 
 function removeDevice(valveId) {
@@ -1532,13 +1792,15 @@ function saveChannelConfig() {
   const config = getActiveConfig()
   if (!config || !activeChannel.value) return
 
-  config.defaultOpenMinutes = Math.max(1, Math.min(1440, Number(configDraft.defaultOpenMinutes) || 10))
+  config.displayName = String(configDraft.displayName || '').trim()
+  config.defaultOpenMinutes = Math.max(1, Math.min(1092, Number(configDraft.defaultOpenMinutes) || 10))
   config.rainStopUntil = configDraft.rainStopUntil || ''
 
   socket.emit('saveChannelConfig', {
     valveId: activeChannel.value.deviceId,
     channelId: activeChannel.value.channelId,
     config: {
+      displayName: config.displayName,
       defaultOpenMinutes: config.defaultOpenMinutes,
       defaultOpenSeconds: config.defaultOpenMinutes * 60,
       rainStopUntil: config.rainStopUntil,
@@ -1590,6 +1852,10 @@ function handleChannelConfigState({ valveId, channelId, config }) {
 
   const target = getDefaultChannelConfig(valveId, channelId)
 
+  if (typeof config.displayName === 'string') {
+    target.displayName = config.displayName
+  }
+
   if (Number.isFinite(Number(config.defaultOpenMinutes))) {
     target.defaultOpenMinutes = Number(config.defaultOpenMinutes)
   } else if (Number.isFinite(Number(config.defaultOpenSeconds))) {
@@ -1610,6 +1876,7 @@ function handleChannelConfigState({ valveId, channelId, config }) {
     Number(activeChannel.value.deviceId) === Number(valveId) &&
     Number(activeChannel.value.channelId) === Number(channelId)
   ) {
+    configDraft.displayName = target.displayName || ''
     configDraft.defaultOpenMinutes = Math.max(1, Number(target.defaultOpenMinutes || 10))
     configDraft.rainStopUntil = toDateTimeLocalInput(target.rainStopUntil)
   }
@@ -1639,6 +1906,7 @@ onMounted(async () => {
   socket.on('deviceUpdate', handleDeviceUpdate)
   socket.on('pairingState', handlePairingState)
   socket.on('channelConfigState', handleChannelConfigState)
+  socket.on('configSyncState', handleConfigSyncState)
   socket.on('gatewaysState', (gws) => { gateways.value = Array.isArray(gws) ? gws : [] })
   socket.on('diagnosticLogs', handleDiagnosticLogs)
 
@@ -1657,6 +1925,7 @@ onUnmounted(() => {
   socket?.off('deviceUpdate', handleDeviceUpdate)
   socket?.off('pairingState', handlePairingState)
   socket?.off('channelConfigState', handleChannelConfigState)
+  socket?.off('configSyncState', handleConfigSyncState)
   socket?.off('gatewaysState')
   socket?.off('diagnosticLogs', handleDiagnosticLogs)
 
@@ -1667,6 +1936,9 @@ onUnmounted(() => {
     window.clearInterval(intervalId)
     intervalId = null
   }
+
+  for (const timer of configSyncClearTimers.values()) clearTimeout(timer)
+  configSyncClearTimers.clear()
 
   if (themeMediaQuery) {
     if (themeMediaQuery.removeEventListener) {

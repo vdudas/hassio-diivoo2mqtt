@@ -24,6 +24,7 @@ class ValveDevice extends EventEmitter {
 
         this.state = 'OFFLINE';
         this.lastSeen = null;
+        this.lastCommandFailureAt = 0;
         this.lastRxSeq = null;
         this.lastRawHex = null;
 
@@ -57,6 +58,9 @@ class ValveDevice extends EventEmitter {
         this.lastBatteryText = options.lastBatteryText ?? 'Unbekannt';
 
         this.trys_refresh_trigger = 0;
+        this.configRefreshQueue = Promise.resolve();
+        this.activeConfigRefresh = null;
+        this.configRefreshPending = 0;
 
         // Kanalstatus
         this.channels = {};
@@ -68,8 +72,21 @@ class ValveDevice extends EventEmitter {
 
     get isOnline() {
         if (!this.lastSeen) return false;
+        if (this.lastCommandFailureAt && this.lastCommandFailureAt >= this.lastSeen) return false;
         const offlineThresholdMs = 12 * 60 * 60 * 1000;
         return (Date.now() - this.lastSeen) < offlineThresholdMs;
+    }
+
+    _markCommandFailure(err) {
+        this.lastCommandFailureAt = Date.now();
+        console.warn(
+            `[Device ${this.valveId}] Marking device unreachable after command failure: ${err.message}`
+        );
+        this._notifyStateChange('COMMAND_UNREACHABLE');
+    }
+
+    _shouldMarkCommandFailure(err) {
+        return !['ACQUIRE_TIMEOUT', 'QUEUE_OVERFLOW'].includes(err?.code);
     }
 
     valve(index) {
@@ -126,16 +143,25 @@ class ValveDevice extends EventEmitter {
             });
 
             const timeoutMs = Number.isInteger(txPolicy.timeoutMs) ? txPolicy.timeoutMs : 8000;
+            const expectedRunning = actionText === 'AN';
+            const responseMatcher = (inbound) => this._matchesActionResponse(
+                inbound,
+                seq,
+                channelIndex,
+                expectedRunning
+            );
 
             const timeout = setTimeout(() => {
+                const err = new Error(`Timeout: No response (0xA1 or 0x02) from device for action ${actionText}`);
                 cleanup();
-                reject(new Error(`Timeout: No response (0xA1 or 0x02) from device for action ${actionText}`));
+                this._markCommandFailure(err);
+                reject(err);
             }, timeoutMs);
 
             this.pendingRequests.set(seq, {
                 channelIndex,
                 actionText,
-                expectedRunning: actionText === 'AN',
+                expectedRunning,
                 resolve: (resultData) => {
                     clearTimeout(timeout);
                     cleanup();
@@ -149,13 +175,39 @@ class ValveDevice extends EventEmitter {
                 payload,
                 `Befehl ${actionText}`,
                 this.getDownlinkChannel(),
-                this.getDownlinkChannel()
+                this.getDownlinkChannel(),
+                { responseMatcher }
             ).catch(err => {
                 clearTimeout(timeout);
                 cleanup();
+                if (this._shouldMarkCommandFailure(err)) {
+                    this._markCommandFailure(err);
+                }
                 reject(err);
             });
         });
+    }
+
+    _matchesActionResponse(inbound, actionSeq, channelIndex, expectedRunning) {
+        if (!inbound || !Number.isInteger(inbound.cmd)) return false;
+
+        if (inbound.cmd === 0xA1) {
+            if (inbound.seq !== actionSeq || !Array.isArray(inbound.payload) || inbound.payload.length < 13) {
+                return false;
+            }
+            const state = utils.decodeStatusSourceByte(inbound.payload[1]);
+            return state.isRunning === expectedRunning;
+        }
+
+        if (inbound.cmd !== 0x02 || !Array.isArray(inbound.payload) || inbound.payload.length < 15) {
+            return false;
+        }
+
+        const reportedChannel = this.normalizeValveIndex(inbound.payload[2]);
+        if (reportedChannel !== channelIndex) return false;
+
+        const state = utils.decodeStatusSourceByte(inbound.payload[3]);
+        return state.isRunning === expectedRunning;
     }
 
     initChannels(count) {
@@ -164,6 +216,7 @@ class ValveDevice extends EventEmitter {
 
         for (let i = 1; i <= count; i++) {
             this.channels[i] = {
+                displayName: '',
                 status: 'AUS',
                 isRunning: false,
                 remaining: 0,
@@ -183,11 +236,17 @@ class ValveDevice extends EventEmitter {
 
     handleIncomingPacket(seq, cmd, payload, rawHex = '', gatewayId = 'default_gw', rssi = -100) {
         const now = Date.now();
+        const recoveredFromCommandFailure = this.lastCommandFailureAt > 0;
         this.lastSeen = now;
+        this.lastCommandFailureAt = 0;
         this.lastRxSeq = seq;
         this.lastRawHex = rawHex;
 
         this.gatewayStats.set(gatewayId, { rssi, lastSeen: now });
+
+        if (recoveredFromCommandFailure) {
+            this._notifyStateChange('COMMAND_REACHABLE');
+        }
 
         for (const [key, timestamp] of this.recentRxPackets.entries()) {
             if (now - timestamp > 5000) {
@@ -214,7 +273,7 @@ class ValveDevice extends EventEmitter {
                 break;
             case 0x02:
                 this.state = 'READY';
-                this.handleStatusReport(seq, payload);
+                this.handleStatusReport(seq, payload, gatewayId);
                 break;
             case 0x04:
                 this.handleEventReport(seq, payload);
@@ -271,14 +330,23 @@ class ValveDevice extends EventEmitter {
                 ch.lastSyncTime = now;
             }
 
-            pending.resolve({
-                channelIndex: pending.channelIndex,
-                status: state.stateText,
-                isRunning: state.isRunning,
-                remainingSeconds,
-                targetSeconds,
-                via: 'action-ack-0xA1'
-            });
+            if (pending.expectedRunning === state.isRunning) {
+                pending.resolve({
+                    channelIndex: pending.channelIndex,
+                    status: state.stateText,
+                    isRunning: state.isRunning,
+                    remainingSeconds,
+                    targetSeconds,
+                    via: 'action-ack-0xA1',
+                    gatewayId,
+                    confirmedAt: Date.now()
+                });
+            } else {
+                console.warn(
+                    `[Device ${this.valveId}] Action ACK did not confirm ${pending.actionText}; ` +
+                    `reported state is ${state.stateText}. Waiting for a matching response or retry.`
+                );
+            }
         }
 
         this._notifyStateChange('ACTION_ACK_0xA1');
@@ -321,7 +389,7 @@ class ValveDevice extends EventEmitter {
         });
     }
 
-    handleStatusReport(seq, payload) {
+    handleStatusReport(seq, payload, gatewayId = null) {
         if (!payload || payload.length < 15) {
             console.log(`[Device ${this.valveId}] Status report too short.`);
             return;
@@ -385,7 +453,9 @@ class ValveDevice extends EventEmitter {
                     isRunning: state.isRunning,
                     remainingSeconds,
                     targetSeconds: runtimeSeconds,
-                    via: 'status-report-0x02'
+                    via: 'status-report-0x02',
+                    gatewayId,
+                    confirmedAt: Date.now()
                 });
                 break;
             }
@@ -452,6 +522,8 @@ class ValveDevice extends EventEmitter {
     }
 
     handleParameterRequest(seq, payload) {
+        this._markConfigPullActivity(0x05);
+
         // Falls das Ventil im payload[1] verrät, für welchen Kanal es Parameter will, 
         // könnten wir das hier auslesen. Wenn nicht, senden wir Standardmäßig für Kanal 1.
         const channelIndex = payload.length > 1 ? this.normalizeValveIndex(payload[1]) || 1 : 1;
@@ -461,6 +533,8 @@ class ValveDevice extends EventEmitter {
     }
 
     handleScheduleRequest(seq, payload) {
+        this._markConfigPullActivity(0x06);
+
         const rawChannelIndex = payload[1];
         const pageRequested = payload[2]; // Welche Seite will das Ventil?
         const valveIndex = this.normalizeValveIndex(rawChannelIndex);
@@ -781,6 +855,110 @@ class ValveDevice extends EventEmitter {
         return this.sendHubPacket(seq, 0x86, payload, 'Empty schedule (0x86)', this.getDownlinkChannel(), this.getDefaultListenChannel());
     }
 
+    _emitConfigSyncState(status, tracker = null, extra = {}) {
+        this.emit('configSyncState', {
+            valveId: this.valveId,
+            status,
+            reason: tracker?.reason || extra.reason || null,
+            pending: this.configRefreshPending,
+            requestCount: tracker?.requestCount || 0,
+            lastCommand: tracker?.lastCommand ?? null,
+            confirmed: false,
+            ts: Date.now(),
+            ...extra,
+        });
+    }
+
+    _markConfigPullActivity(command) {
+        if (!this.activeConfigRefresh) return;
+
+        this.activeConfigRefresh.lastActivityAt = Date.now();
+        this.activeConfigRefresh.requestCount++;
+        this.activeConfigRefresh.lastCommand = command;
+        this._emitConfigSyncState('pulling', this.activeConfigRefresh);
+    }
+
+    queueConfigRefresh(reason = 'config-change', options = {}) {
+        this.configRefreshPending++;
+        this._emitConfigSyncState('queued', null, { reason });
+
+        const task = this.configRefreshQueue
+            .catch(() => {})
+            .then(() => this._runConfigRefresh(reason, options));
+        const trackedTask = task.finally(() => {
+            this.configRefreshPending = Math.max(0, this.configRefreshPending - 1);
+        });
+
+        // Keep the queue usable after a failed refresh while returning the
+        // original task (including its error) to the caller.
+        this.configRefreshQueue = trackedTask.catch(() => {});
+        return trackedTask;
+    }
+
+    async _runConfigRefresh(reason, options = {}) {
+        const quietMs = Number.isInteger(options.quietMs) && options.quietMs >= 0
+            ? options.quietMs
+            : 3000;
+        const maxWaitMs = Number.isInteger(options.maxWaitMs) && options.maxWaitMs > 0
+            ? options.maxWaitMs
+            : 20000;
+        const maxRetransmits = Number.isInteger(options.maxRetransmits) && options.maxRetransmits >= 0
+            ? options.maxRetransmits
+            : 2;
+        const tracker = {
+            reason,
+            startedAt: Date.now(),
+            lastActivityAt: 0,
+            requestCount: 0,
+            lastCommand: null,
+        };
+
+        this.activeConfigRefresh = tracker;
+        this._emitConfigSyncState('notifying', tracker);
+        console.log(`[Device ${this.valveId}] Starting serialized config refresh (${reason}).`);
+
+        try {
+            const followUps = await this.sendPingTrigger(null, maxRetransmits, 0x03);
+
+            if ((!Array.isArray(followUps) || followUps.length === 0) && tracker.requestCount === 0) {
+                this._emitConfigSyncState('no_response', tracker);
+                return followUps;
+            }
+
+            if (tracker.lastActivityAt === 0) {
+                tracker.lastActivityAt = Date.now();
+            }
+
+            while (Date.now() - tracker.startedAt < maxWaitMs) {
+                const idleMs = Date.now() - tracker.lastActivityAt;
+                if (idleMs >= quietMs) {
+                    console.log(
+                        `[Device ${this.valveId}] Config pull became idle after ` +
+                        `${tracker.requestCount} request(s) (${reason}).`
+                    );
+                    this._emitConfigSyncState('idle', tracker);
+                    return followUps;
+                }
+
+                await new Promise(resolve => setTimeout(resolve, Math.min(100, quietMs - idleMs)));
+            }
+
+            console.warn(
+                `[Device ${this.valveId}] Config refresh wait limit reached after ` +
+                `${tracker.requestCount} request(s) (${reason}).`
+            );
+            this._emitConfigSyncState('timeout', tracker);
+            return followUps;
+        } catch (err) {
+            this._emitConfigSyncState('failed', tracker, { error: err.message });
+            throw err;
+        } finally {
+            if (this.activeConfigRefresh === tracker) {
+                this.activeConfigRefresh = null;
+            }
+        }
+    }
+
     async sendRefreshTrigger(correlationToken = null) {
         const seq = this.nextCommandSeq();
         const token = correlationToken ?? seq;
@@ -1067,6 +1245,7 @@ class ValveDevice extends EventEmitter {
                     fallbackToLegacySpam: !!txPolicy.fallbackToLegacySpam,
                     refreshTrigger: !!txPolicy.refreshTrigger,
                     listenWindowMs: txPolicy.listenWindowMs,
+                    responseMatcher: txPolicy.responseMatcher,
                 }
             );
         }
@@ -1168,6 +1347,7 @@ class ValveDevice extends EventEmitter {
             }
 
             liveChannels[i] = {
+                displayName: typeof ch.displayName === 'string' ? ch.displayName : '',
                 status: liveStatus,
                 isRunning: liveIsRunning,
                 remainingLive: currentRemaining,

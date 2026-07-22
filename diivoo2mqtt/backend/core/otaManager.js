@@ -9,7 +9,8 @@ class OtaManager extends EventEmitter {
         super();
         this.hub = hub;
         this.otaDir = path.join(__dirname, '..', 'public', 'ota');
-        this.versionsUrl = 'https://raw.githubusercontent.com/Technerd-SG/hassio-diivoo2mqtt/main/firmware/versions.json';
+        this.versionsUrl = process.env.FIRMWARE_VERSIONS_URL ||
+            'https://raw.githubusercontent.com/Technerd-SG/hassio-diivoo2mqtt/main/firmware/versions.json';
         this.latestVersions = {}; // model -> { version, binUrl }
         this.downloadedBins = new Map(); // model -> localPath
 
@@ -149,16 +150,30 @@ class OtaManager extends EventEmitter {
         }
 
         // Lass den ESP32 aktiv die erreichbare IP herausfinden
-        const port = localServerPort || process.env.WEB_PORT || 8099;
-        console.log(`[OTA] Sending IP probe to gateway ${gatewayId}...`);
-        const addonIp = await gw.probeAddonIp(port);
+        const port = Number(
+            localServerPort ||
+            this.hub.config?.webPort ||
+            process.env.PORT ||
+            process.env.WEB_PORT ||
+            3000
+        );
+        if (!Number.isInteger(port) || port < 1 || port > 65535) {
+            throw new Error(`Invalid OTA server port: ${port}`);
+        }
+        const configuredOtaHost = String(process.env.OTA_HOST || '').trim() || null;
+        console.log(
+            `[OTA] Sending reachability probe to gateway ${gatewayId}` +
+            `${configuredOtaHost ? ` via configured host ${configuredOtaHost}` : ''}...`
+        );
+        const addonIp = await gw.probeAddonIp(port, configuredOtaHost);
 
-        const otaUrl = `http://${addonIp}:${port}/ota/${localFileName}`;
+        const otaHost = addonIp.includes(':') ? `[${addonIp}]` : addonIp;
+        const otaUrl = `http://${otaHost}:${port}/api/ota/${encodeURIComponent(localFileName)}`;
         console.log(`[OTA] Sending update command to gateway ${gatewayId}: ${otaUrl}`);
 
         if (gw.isConnected) {
             gw.otaPendingVersion = latest.version; // Merken, auf welche Version wir updaten
-            gw.sendOta(otaUrl);
+            await gw.sendOta(otaUrl);
             return true;
         } else {
             throw new Error('Gateway is not connected');

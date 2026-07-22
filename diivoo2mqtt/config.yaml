@@ -1,5 +1,5 @@
 name: "Diivoo2MQTT"
-version: "0.1.58"
+version: "0.1.59"
 slug: "diivoo2mqtt"
 description: "A Home Assistant add-on for running DIIVOO water timers locally over MQTT "
 url: "https://github.com/Technerd-SG/hassio-diivoo2mqtt"
@@ -33,6 +33,7 @@ options:
   mqtt_port: 1883
   mqtt_username: ""
   mqtt_password: ""
+  ota_host: ""
   language: "en"
 
 schema:
@@ -40,4 +41,5 @@ schema:
   mqtt_port: port
   mqtt_username: str
   mqtt_password: password?
+  ota_host: str?
   language: "list(en|de|nl|fr|es|it|pl|pt|sv|nb|da|fi|cs|sk|hu|ro|hr|sl|bg|lt|lv|et|el|tr|ru|uk|zh-Hans|zh-Hant|ja|ko|ar|he|vi|id|ms|th)"
